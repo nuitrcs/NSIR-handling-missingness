@@ -1,0 +1,363 @@
+---
+title: "Handling Missingness in R"
+format: html
+editor: visual
+---
+
+```{r, include=FALSE}
+if (!("VIM" %in% installed.packages()[,"Package"])) install.packages("VIM")
+if (!("tidyverse" %in% installed.packages()[,"Package"])) install.packages("tidyverse")
+if (!("visdat" %in% installed.packages()[,"Package"])) install.packages("visdat")
+if (!("naniar" %in% installed.packages()[,"Package"])) install.packages("naniar")
+if (!("mice" %in% installed.packages()[,"Package"])) install.packages("mice")
+
+library(VIM)
+library(tidyverse)
+```
+
+# Introduction
+
+Missing values represent values that are unknown. You will often encounter missing values in data analysis, and it is important that you account for them. Depending on what is missing from the data and why it is missing, it can reduce statistical power, produce biased estimates and possibly invalidate your conclusion.
+
+In this workshop, we will go over the basic properties of missing values in R and the tools to help you visualize and work with missing data. We will also briefly go over some important aspects of missing data, such as the different types of missingness.
+
+## Data
+
+Throughout this workshop, I will use two datasets from the `VIM` package:
+
+-   `diabetes` dataset: This is originally from the National Institute of Diabetes and Digestive and Kidney Diseases, and was used to try to predict whether or not a patient has diabetes based on certain diagnostic measurements. All patients here are females at least 21 years old of Pima Indian heritage. You can learn more about it [from this lin](https://www.kaggle.com/datasets/uciml/pima-indians-diabetes-database/data)
+
+    ```{r}
+    head(diabetes)
+    ```
+
+-   `sleep` dataset: This dataset comes from a study in the interrelationships between sleep, ecological, and constituional variables in 39 mammalian species.
+
+    ```{r}
+    head(sleep)
+    ```
+
+# Properties of Missingness in R
+
+In R, the most common type of missing value you will encounter is `NA`. Notice how this is written without quotes. With quotes it would be `"NA"`, which is a character object. `NA` is a name reserved in R and you cannot assign a variable to this name.
+
+```{r}
+#| label: name_NA
+#| error: true
+
+NA <- "some_value"
+```
+
+There are many different flavors of missing values that you may encounter in R. However in most cases, `NA` will be all that you really need.
+
+-   `NA_character_`, `NA_real_`, `NA_integer_`: these are variations of `NA` that are specific to the object class (integer, character, logical, etc.)
+-   `NULL`: this is another reserved value in R. This is often returned by expressions or functions that are *undefined*. When working with data, `NULL` is rarely what you want over `NA`. You can learn more about `NULL` vs `NA` [in this blog post](https://www.r-bloggers.com/2010/04/r-na-vs-null/)
+-   `NaN`: This stands for "**N**ot **A** **N**umber". Generally values that are impossible are assigned this value (i.e. log(-1)).
+
+`NA` values are contagious in that many operations involving `NA` will return `NA`.
+
+```{r}
+#| label: compare_NA
+
+x <- c(1,2,3,NA,5)
+print(x / 2)
+print(x == 2)
+```
+
+Mathematical functions like `mean()` are also affected by `NA`.
+
+```{r}
+#| label: mean_with_NA
+
+mean(x)
+```
+
+Fortunately, there are often options in these kinds of functions that let you account for the presence of missing data. By specifying `na.rm = TRUE`, I am telling the function to remove the missing value(s) when calculating the mean in the vector.
+
+```{r}
+#| label: mean_rm_NA
+
+mean(x, na.rm = TRUE)
+```
+
+You cannot check if a value is `NA` with `==`. Instead you will have to use a special function called `is.na()`.
+
+```{r}
+#| label: check_NA
+
+print(x == NA)
+print(is.na(x))
+```
+
+You can also apply this function directly to a data frame.
+
+```{r}
+df1 <- data.frame(
+  column_1 = c(1,2,3,NA,5),
+  column_2 = c('a','b',NA,'d','e')
+)
+
+print(df1)
+print(is.na(df1))
+```
+
+## Exercise 1
+
+For `diabetes` dataset, try to find how many missing values there are for each column.
+
+**HINT**: `colSums` function take the sum of each column in a data frame.
+
+```{r}
+# Type your answer here
+```
+
+# Assess Missingness
+
+When conducting data analysis, one of the first thing you may want to do is assess the missingness situation in your data. For this process, we will use two packages: `visdat` and `naniar`.
+
+## With `visdat`
+
+```{r}
+library(visdat)
+```
+
+`visdat` package provides two useful functions: `vis_dat` and `vis_miss`. These functions provide you with a tool to quickly glance at how much data you may be dealing with.
+
+Both functions let you visualize the data frame at a glance. `vis_dat` tells you the data type of each column and whether the data is missing or not. `vis_miss` provides a summary of which data is missing and how much of each column has missing data (number is provided along with the column name).
+
+```{r}
+#| label: visdat_functions
+
+vis_dat(diabetes)
+vis_miss(diabetes)
+```
+
+You can also *sort* the columns based on the amount of missingness. Another useful argument is `cluster=`, which uses an algorithm called *hierarchical clustering* to group rows with similar missing patterns together.
+
+**Note**: [Hierarchical Clustering](https://en.wikipedia.org/wiki/Hierarchical_clustering) is one of several unsupervised learning methods for grouping similar observations into what is called clusters.
+
+```{r}
+vis_miss(diabetes, sort = TRUE, cluster = TRUE)
+```
+
+According to the plot we can see that `Insulin` variable is missing in nearly half of the observations, and most observations that is missing other variables also has missing `Insulin`.
+
+## with `naniar`
+
+```{r}
+library(naniar)
+```
+
+You can also visualize the frequency of missing data using `gg_miss_var()` and `gg_miss_upset()` from the `naniar` package.
+
+```{r}
+#| label: naniar_gg_miss
+
+gg_miss_var(diabetes)
+gg_miss_upset(diabetes)
+```
+
+The bottom plot is called an UpSet plot. It lets you visualize the size of intersection across multiple sets, similar to Venn Diagrams. Venn Diagram can get messy as the number of sets and possible intersections increases. UpSet plot can clearly show which intersection is being represented and let you compare across different sets.
+
+`gg_miss_var` allows for faceting based on a categorical variable to let you look at the number of missing values of each variable per group. If you are familiar with `ggplot2`, you may already have worked with `facets`, which are individual panels that are split based on a categorical variable.
+
+In the following plot, I am plotting the number of missing values based on the `outcome` variable. Specifying `show_pct=TRUE` puts the scale to percentage missing instead of the missing count.
+
+```{r}
+#| label: gg_miss_var_faceting
+
+gg_miss_var(diabetes, facet = Outcome, show_pct=TRUE)
+```
+
+This type of plot can be particularly useful if you are looking for a missingness pattern based on a variable's value.
+
+### Exploring Continuous Variables' Relationship with Missing Data
+
+In data analysis you will often look at relationship between continuous variables. Let's try to plot the relationship between `Insulin` and `Glucose`
+
+```{r}
+ggplot(diabetes) +
+  geom_point(aes(x = Insulin, y = Glucose))
+```
+
+`ggplot2` defaults to removing observations where any of the x- or y- values is `NA`. How could we also include the relationship between two variables when a data is missing? What would be a logical way of representing the data when a part of it is missing? `geom_miss_point()` from the `naniar` package provides a solution to this by replacing the `NA` values with values that is \~10% lower than the minimum value.
+
+```{r}
+ggplot(diabetes) + 
+  geom_miss_point(aes(x = Insulin, y = Glucose))
+```
+
+In this plot, you can see observations in which both Insulin and Glucose are available as well as one or both variables are missing. The red points on the left side of the plot are data points with missing insulin value.
+
+This plot lets you look at the relationship between two variables and see the distribution of one variable when the other is missing.
+
+## Exercise 2
+
+So far the functions we have covered a few functions for visualizing missing data are:
+
+-   `visdat::vis_dat`
+
+-   `visdat::vis_miss`
+
+-   `naniar::gg_miss_var`
+
+-   `naniar::gg_miss_upset`
+
+-   `naniar::geom_miss_point`
+
+Explore missingness pattern in `sleep` dataset using the visualization methods used above.
+
+```{r}
+# Type your answer here
+```
+
+## Additional Features of `naniar`
+
+Beyond what we have gone over, `naniar` offers more features and visualizations that I encourage you to explore. You can learn more about the package [here](https://cran.r-project.org/web/packages/naniar/vignettes/getting-started-w-naniar.html). Some of the features not covered are:
+
+-   Representing missing data structure with the *shadow matrix*
+
+-   Convenience functions to help with quantifying missing values
+
+-   Additional visualization functions such as `gg_miss_fct` and `gg_miss_case`
+
+# Types of Missing Data
+
+Before moving on to talk about what to do with missing data, there is an important topic we should cover: types of missing data. Data can be missing due to different mechanisms. There are three different types: Missing Completely At Random, Missing At Random, and Missing Not At Random. Depending on the type of missing data you have, your subsequent analysis steps can be affected.
+
+## Types of Missing Data
+
+1.  Missing Completely At Random (**MCAR**): There is no relationship between the probability that your data is missing and any variables in your data. Encountering this type of missing data is rare.
+    -   if the missing insulin data is due to some data handling error after collection, insulin variable may be MCAR
+2.  Missing At Random (**MAR**): This is slightly misleading, as the data is not missing entirely at random, and the probability of missing is related to some variable in the observed data. It might be better characterized as the data missing **conditionally** at random. The missing data is randomly related to the missing observation (unknown) itself (i.e. the true value of the missing data does not affect the missing status), but not random to other variables.
+    -   In some surveys, women might be more inclined to decline answering some questions than men, and vice versa, regardless of the actual answer.
+3.  Missing Not At Random (**MNAR**): There is a missing pattern, but it cannot be determined by our observed data. This can happen when the mechanism of missingness is related to the variable itself.
+    -   Individuals with very high income are less likely to report their income than those with moderate income.
+
+There is a test for testing if the data is missing at random, which is called Little's Test. Although this can be a useful tool, the best tool is your domain knowledge in the area, which you can use along with visualizations to reason out the mechanism for missing data.
+
+# Different Ways to Handle Missing Data
+
+There are various ways to handle missing data, depending one what you are dealing with.
+
+## Listwise Deletion
+
+If you have decided that your data is MCAR, and there aren't many observations with missing data, you could remove observations with missing values. This can easily be done with `drop_na()` function from `dplyr` package.
+
+```{r}
+# drop observations with any missing value
+diabetes_no_na <- diabetes %>%
+  drop_na()
+
+print(paste("Number of missing values in the data:",sum(is.na(diabetes_no_na))))
+print(paste("Dimension:",paste(dim(diabetes_no_na), collapse = ", ")))
+```
+
+You can also drop observations with missing values in specific variables by specifying them in `drop_na()`.
+
+```{r}
+# drop observations with missing insulin value
+diabetes_no_na_1 <- diabetes %>%
+  drop_na(Insulin)
+
+print(paste("Number of missing values in the data:",sum(is.na(diabetes_no_na_1))))
+print(paste("Number of missing values in Insulin variable:", sum(is.na(diabetes_no_na_1$Insulin))))
+print(paste("Dimension:",paste(dim(diabetes_no_na_1), collapse = ", ")))
+```
+
+## Imputation
+
+If you opt to remove all observations with missing data, you might end up with a much smaller sample size, resulting in a loss of statistical power. Also depending on which observations are missing, you could also bias your result by removing a certain group of samples. Instead of deleting these observations, you can opt to fill in the values with the most reasonable guess. We will go over some of these methods.
+
+### Mean / Median Imputation
+
+If you are doing a simple analysis or have enough reason to believe that your data is MCAR, you could opt into use mean or median imputation.
+
+You can choose to impute by mean or median after inspecting the distribution of your sample. Deciding based on the shape of distribution is important because mean is much more sensitive to outliers. For example, if we look at the distribution of `Insulin` and plot the mean (solid line) and the median (dashed line), we can see that the mean is pulled towards the more extreme values, while the median stays closer to where most values are concentrated.
+
+```{r}
+ins_mean <- mean(diabetes$Insulin,na.rm = TRUE)
+ins_median <- median(diabetes$Insulin, na.rm = TRUE)
+
+ggplot(diabetes) +
+  geom_histogram(aes(x = Insulin)) +
+  geom_vline(xintercept = ins_mean, color = "red") +
+  geom_vline(xintercept = ins_median, color = "red", linetype = "dashed")
+
+```
+
+Imputing with mean / median can be done with using `replace_na` from tidyr.
+
+```{r}
+insulin_imputed <- diabetes %>%
+  mutate(
+    Insulin = replace_na(Insulin, replace = median(Insulin, na.rm=TRUE))
+  )
+
+# print median of insulin
+print(median(diabetes$Insulin, na.rm=TRUE))
+
+# print imputed values of insulin
+head(insulin_imputed$Insulin[is.na(diabetes$Insulin)])
+```
+
+However, this might not be the best option for `Insulin` because nearly half the observations are missing, and this could change the distribution of your data.
+
+```{r}
+ggplot(insulin_imputed) +
+  geom_histogram(aes(x = Insulin))
+```
+
+### Exercise 3
+
+The `sleep` dataset has missing values in `NonD`, `Dream`, `Sleep`, `Span`, and `Gest`. Remove observations that have missing values in `NonD` and `Dream`, and impute `Span`, and `Gest` with a statistic (mean or median) that you think is appropriate. Save the imputed results to `Span_imp` and `Gest_imp` column, respectively.
+
+```{r}
+# write your answer here
+
+```
+
+```{r}
+ggplot(sleep_final) +
+  geom_point(aes(x = Span_imp, y = Gest_imp, color = is.na(Span)))
+ggplot(sleep_final) +
+  geom_point(aes(x = Span_imp, y = Gest_imp, color = is.na(Gest)))
+```
+
+### Multiple Imputation
+
+The last type of imputation we will cover is a powerful method called multiple imputation. If you have a data that is MAR, you can consider this method to reduce bias. The basic idea of multiple imputation is to create multiple data sets with missing values imputed with plausible values. This will result in data sets with different values for the missing observations. You can do statistical modelling with these new data sets and pool the results together. This will result in the final model taking into account the uncertainty associated with guessing values that are missing.
+
+In R, [mice package](https://amices.org/mice/) takes care of multiple imputation, statistical modeling across multiple plausible data sets, and pooling results together.
+
+In the following example, I will select 4 variables (1 binary outcome and 3 numeric variables) and run [logistic regression](https://en.wikipedia.org/wiki/Logistic_regression) on the outcome with multiple imputation.
+
+NOTE: Logistic regression is a statistical model that lets you model probability of an outcome.
+
+```{r}
+library(mice)
+
+# subset dataset
+diab_subset <- diabetes[,c("Outcome","Insulin","BMI","BloodPressure")]
+
+# multiple imputation with mice
+diabetes_mice <- mice(
+  diab_subset, 
+  m = 5 # this parameter lets you choose number of multiple imputations
+)
+
+# use with(data, model) syntax to run statistical model with mice output
+diab_glm <- with(diabetes_mice, glm(Outcome ~ Insulin + BMI + BloodPressure, family = binomial))
+
+# print(diab_glm)
+# summary(diab_glm$analyses[[1]])
+# summary(diab_glm$analyses[[2]])
+
+# pool results together
+pool.fit <- pool(diab_glm)
+summary(pool.fit)
+```
+
+# Wrap Up
+
+As you conduct data analysis, you will certainly run into missing data. We have gone over the basic properties of missing data in R, ways to visualize and assess missingness across your data, discussed the different types of mechanism that could be generating missing values in your data, and how to deal with missing data. Missing data can sometimes influence or bias your models, so these skills should help you enhance the integrity and robustness of your findings. The methods I have shown is a small part of available methods out there, so I encourage you to learn more!
