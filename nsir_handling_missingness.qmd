@@ -25,13 +25,13 @@ In this workshop, we will go over the basic properties of missing values in R an
 
 Throughout this workshop, I will use two datasets from the `VIM` package:
 
--   `diabetes` dataset: This is originally from the National Institute of Diabetes and Digestive and Kidney Diseases, and was used to try to predict whether or not a patient has diabetes based on certain diagnostic measurements. All patients here are females at least 21 years old of Pima Indian heritage. You can learn more about it [from this lin](https://www.kaggle.com/datasets/uciml/pima-indians-diabetes-database/data)
+-   `diabetes` dataset: This is originally from the National Institute of Diabetes and Digestive and Kidney Diseases, and was used to try to predict whether or not a patient has diabetes based on certain diagnostic measurements. All patients here are females at least 21 years old of Pima Indian heritage. You can learn more about it [from this link](https://www.kaggle.com/datasets/uciml/pima-indians-diabetes-database/data)
 
     ```{r}
     head(diabetes)
     ```
 
--   `sleep` dataset: This dataset comes from a study in the interrelationships between sleep, ecological, and constituional variables in 39 mammalian species.
+-   `sleep` dataset: This dataset comes from a study in the interrelationships between sleep, ecological, and constitutional variables in 39 mammalian species.
 
     ```{r}
     head(sleep)
@@ -310,7 +310,7 @@ ggplot(insulin_imputed) +
 
 ### Exercise 3
 
-The `sleep` dataset has missing values in `NonD`, `Dream`, `Sleep`, `Span`, and `Gest`. Remove observations that have missing values in `NonD` and `Dream`, and impute `Span`, and `Gest` with a statistic (mean or median) that you think is appropriate. Save the imputed results to `Span_imp` and `Gest_imp` column, respectively.
+The `sleep` dataset has missing values in `NonD`, `Dream`, `Sleep`, `Span`, and `Gest`. Remove observations that have missing values in `NonD` and `Dream`, and impute `Span`, and `Gest` with a statistic (mean or median) that you think is appropriate. Save the imputed results to `Span_imp` and `Gest_imp` column, respectively. Store the final data frame into `sleep_final`.
 
 ```{r}
 # write your answer here
